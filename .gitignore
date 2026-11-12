@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.venv/
+*.log
+.dfa/
+# Eval fixtures: memory dumps are ~550MB each (GitHub rejects files >100MB).
+# Ground-truth JSONs, notes, enactment scripts and ISF build script ARE
+# tracked; dumps are reproducible via eval/fixtures/work/ scripts.
+eval/fixtures/batch1/*.mem
+eval/fixtures/work/

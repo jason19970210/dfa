@@ -1,0 +1,26 @@
+{
+  "beacon_cmdline": "python3 /tmp/.systemd-cache.py",
+  "beacon_comm": "python3",
+  "beacon_implant_path": "/tmp/.systemd-cache.py",
+  "beacon_parent_chain_at_launch": "1294(guest_s2.sh) 1292(sudo) 1291(sshd) 1237(sshd) 906(sshd) 1(systemd)",
+  "beacon_pid": 1299,
+  "beacon_ppid_at_dump": 1,
+  "beacon_ppid_at_launch": 1294,
+  "c2_host_guest_view": "10.0.2.2",
+  "c2_host_host_view": "127.0.0.1",
+  "c2_log": "beacon check-in 'beacon dfa-s2-fixture' received; fake C2 sent 'whoami', beacon replied 'root'",
+  "c2_port": 4444,
+  "enact_end_utc": "2026-10-18T05:12:45Z",
+  "enact_start_utc": "2026-10-18T05:12:32Z",
+  "established_conn_ss": "ESTAB 0      0          10.0.2.15:51614     10.0.2.2:4444",
+  "expected_artifacts": {
+    "linux_bash": "attacker commands: curl pipe to bash, nohup launch",
+    "linux_pslist": "python3 process (comm=python3) with cmdline /tmp/.systemd-cache.py",
+    "linux_pstree": "beacon reparented under init/systemd (ppid=1) after launcher exits",
+    "linux_psaux": "full implant path in cmdline",
+    "linux_sockstat": "ESTABLISHED tcp 10.0.2.2:4444 from beacon pid"
+  },
+  "kernel": "6.8.0-147-generic",
+  "name": "reverse_shell_c2_beacon",
+  "scenario": "S2"
+}

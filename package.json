@@ -1,0 +1,38 @@
+{
+  "bin": {
+    "dfa-agents": "./dist/main.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.23.8"
+  },
+  "description": "DFA: Digital Forensics Anything — one MCP server for DFIR across memory, disk, timeline, and network evidence.",
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "ARCHITECTURE.md"
+  ],
+  "license": "MIT",
+  "name": "dfa-agents",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/main.ts",
+    "doctor": "node dist/main.js doctor",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "postbuild": "chmod +x dist/main.js",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}

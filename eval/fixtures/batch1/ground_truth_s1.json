@@ -1,0 +1,25 @@
+{
+  "scenario": "S1",
+  "name": "cryptominer",
+  "enact_start_utc": "2026-10-18T05:00:32Z",
+  "enact_end_utc": "2026-10-18T05:01:14Z",
+  "kernel": "6.8.0-147-generic",
+  "miner_pid": 1546,
+  "miner_comm": "xmrig",
+  "miner_cmdline": "xmrig /usr/local/bin/xmrig.py",
+  "miner_ppid": "1398",
+  "pool_host_guest_view": "10.0.2.2",
+  "pool_host_host_view": "127.0.0.1",
+  "pool_port": 3333,
+  "pool_user": "dfa-worker-batch1",
+  "cron_path": "/etc/cron.d/xmrig-miner",
+  "cron_content": "@reboot root /usr/bin/python3 /usr/local/bin/xmrig.py",
+  "miner_path": "/usr/local/bin/xmrig.py",
+  "established_conn_ss": "ESTAB 0      0          10.0.2.15:56346     10.0.2.2:3333  users:((\"xmrig\",pid=1546,fd=3))",
+  "expected_artifacts": {
+    "linux_pslist": "process comm=xmrig (python3)",
+    "linux_bash": "no miner traces expected (launched non-interactively)",
+    "linux_psaux": "python3 /usr/local/bin/xmrig.py (argv0 xmrig)",
+    "linux_sockstat": "ESTABLISHED tcp 10.0.2.2:3333 from miner pid"
+  }
+}
