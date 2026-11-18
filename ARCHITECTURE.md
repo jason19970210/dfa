@@ -1,88 +1,117 @@
-# DFA: Digital Forensics Anything — 架構
+# Architecture
 
-> 對標 REA（Reverse Engineer Anything, morluto/rea）的 "One MCP for DFIR"。
-> Slogan: **One MCP for DFIR across memory, disk, timeline, and network evidence.**
+This document describes what exists in v0.1.0. Planned work is in
+[ROADMAP.md](ROADMAP.md).
 
-## 1. 為什麼值得做
+## Overview
 
-- 現況是散的：Volatility-MCP、Velociraptor-MCP、Wazuh-MCP… 各自為政，沒有統一的鑑識方法論、沒有 chain-of-custody、沒有證據完整性保證。
-- 已確認的缺口（2026-10-17 調查）：**磁碟鑑識（Autopsy/Sleuth Kit）、sandbox、GRR 都還沒有 MCP server**。
-- REA 已驗證的模式可直接複用：單一 MCP tool catalog + skill（workflow 指令）+ setup/doctor CLI + contracts + evaluation harness。
-- 本專案的 stack（TypeScript/Node）與 REA 完全一致，可直接借鏡其原始碼結構。
-
-## 2. 對標 REA 的架構
+DFA is a stdio MCP server written in TypeScript. It exposes one tool per
+allow-listed Volatility 3 plugin, plus three tools of its own. It starts
+Volatility as a child process, parses its JSON output, records the call in a
+custody log and returns the rows to the agent.
 
 ```
-dfa/
-  src/
-    server/            # MCP server, tool catalog 生成
-    volatility3/       # provider: 記憶體鑑識 (Volatility 3 CLI 包裝)
-    sleuthkit/         # provider: 磁碟鑑識 (fls/icat/mmls/fsstat, 唯讀掛載)
-    plaso/             # provider: super-timeline (log2timeline + psort 查詢)
-    yara/              # provider: YARA 規則管理 + 掃描
-    evtx/              # provider: Windows 事件日誌解析
-    registry/          # provider: registry hive 解析
-    tshark/            # provider: pcap 分析 (可借鏡 REA 的 pcap 實作)
-    velociraptor/      # provider: VQL triage (選配, 需 server)
-    intel/             # provider: VT/MISP/ATT&CK 富化 (能復用社群 MCP 就不重造)
-    custody/           # chain-of-custody: 每次 tool call 的 hash-chained audit log
-    contracts/         # 工具結果/證據輸入/scope 契約 (對標 REA docs/mcp-contracts.md)
-    setup/             # npx dfa-agents setup --client <claude_code|codex|cursor...>
-    doctor/            # 診斷註冊/引擎可用性
-    evaluation/        # 合成 DFIR 場景迴歸測試 (見 §5)
-  skills/
-    dfir-investigate/
-      SKILL.md         # 何時用 DFA、六階段方法論、證據紀律
-      references/
-        methodology.md        # 識別→蒐集→檢驗→分析→時間軸→報告
-        memory-forensics.md
-        disk-forensics.md
-        timeline-analysis.md
-        windows-artifacts.md
-        chain-of-custody.md
-  bridge/              # 需要時：在鑑識工具內執行的橋接腳本 (對標 REA bridge/)
-  docs/
+agent (MCP client)
+   |  stdio
+   v
+src/server        tool catalog, annotations, result envelopes
+   |
+   +--> src/evidence      resolve the image path
+   +--> src/volatility3   build the argv, parse the JSON
+   |        +--> src/process   run the child process within limits
+   +--> src/custody       append to / verify the hash-chained log
+   +--> src/report        render and write the HTML report
 ```
 
-## 3. 核心設計原則（從 REA 借來，DFIR 版加強）
+| Module | Responsibility |
+|---|---|
+| `src/main.ts` | CLI: `serve` (default), `doctor`, `report`, `--help`, `--version` |
+| `src/server/index.ts` | Registers the tools, pages results, builds responses |
+| `src/config.ts` | Paths under `DFA_HOME`, symbol directories, Volatility's environment |
+| `src/evidence/paths.ts` | Image path resolution |
+| `src/volatility3/Volatility3Client.ts` | Plugin allow-list, argv, output parsing, image hash |
+| `src/process/runCommand.ts` | Bounded child-process runner |
+| `src/custody/CustodyLog.ts` | Canonical JSON, hash chain, verification |
+| `src/contracts/` | Error codes and the tool result envelope |
+| `src/report/` | Input schemas, HTML rendering, exclusive file creation |
+| `skills/dfir-investigate/` | Agent skill: methodology and evidence discipline |
 
-1. **證據唯讀**：所有 provider 預設唯讀；寫入操作需要明確 scope 授權。掛載磁碟映像一律 read-only loop。
-2. **證據 + 限制**：每個結論附證據與限制（REA 的 evidence discipline），鑑識報告禁不起「好像是」。
-3. **Chain of custody**：每次工具呼叫記錄輸入 hash → hash-chained audit log，可匯出 HTML/PDF 報告（VESTIGEX 已證明這是剛需）。
-4. **Scope contracts**：工具呼叫前聲明作用域與本地影響（對標 REA mcp-contracts.md 的 Request scope and local effects）。
-5. **本地分析**：證據不上雲；富化查詢（VT）才走網路，且明確標示。
+## One analysis call
 
-## 4. 與現有生態的關係（不重造輪子）
+1. **Path.** The image path is resolved with `realpath` and must be a regular
+   file. If `DFA_EVIDENCE_DIR` is set, the resolved path must be inside it.
+   Errors: `evidence_not_found`, `evidence_not_regular_file`,
+   `evidence_outside_root`.
+2. **Run.** Volatility is started without a shell as
+   `vol -q --offline --cache-path <DFA_HOME>/cache/volatility3 [-s <dirs>] -f <image> -r json <plugin> [--pid N]`.
+   The plugin comes from a fixed allow-list; the only free argument is a
+   numeric PID on the tools that accept one. `XDG_CACHE_HOME` points under
+   `DFA_HOME`, so Volatility's own cache stays there too.
+3. **Limits.** A 10-minute timeout sends SIGTERM to the child's process
+   group and SIGKILL five seconds later. Standard output is capped at
+   256 MiB; only the last 64 KiB of standard error are kept. On Linux hosts
+   with `prlimit`, the child's address space is capped at 4 GiB. Errors:
+   `backend_timeout`, `backend_output_too_large`, `backend_failed`.
+4. **Parse.** Output must be a JSON array of rows (or the older
+   columns/rows object). Empty or malformed output is
+   `backend_malformed_output`, never "zero rows".
+5. **Hash.** The image's SHA-256 is computed (after the run, and cached by
+   size and modification time; see the limitations in the README).
+6. **Custody.** One record is appended (next section).
+7. **Result.** Up to 200 rows are returned, with the totals, the image hash
+   and the custody sequence number and hash, as both text and
+   `structuredContent`.
 
-- 富化層直接復用社群 MCP（VirusTotal、MISP、ATT&CK）。
-- 缺口處自己造：Sleuth Kit provider、plaso provider、evtx provider 目前都沒有好的 MCP。
-- REMnux-mcp 的 `suggest_tools` 概念可借鏡：依證據類型推薦分析鏈。
+## Custody log
 
-## 5. Evaluation harness（技術含量的關鍵）
+One JSON object per line. Fields: `seq`, `ts`, `tool`, `argsHash`,
+`evidenceHash`, `outputHash`, `detail`, `note`, `prevHash`, `hash`.
 
-合成可重現的 DFIR 場景，迴歸測試 agent 的調查品質：
-- 記憶體映像（含 process injection）→ agent 應找出惡意 process + C2 IP
-- EVTX（含橫向移動）→ agent 應重建時間軸
-- 磁碟映像（含刪除檔案）→ agent 應恢復並計算 hash
-每個場景有 ground truth，CI 自動評分。這是 REA `src/evaluation/` 的 DFIR 版，也是 repo 最有說服力的部分。
+- `argsHash` and `outputHash` are SHA-256 over canonical JSON (keys sorted
+  at every level): of the call's arguments (image path, plugin, Volatility
+  argv) and of the full row set.
+- `hash = sha256(prevHash + canonicalJson(record without hash))`. The first
+  record chains to a fixed genesis string.
 
-## 6. MVP 選項（2026-10-17 選定 A）
+Verification re-walks the file and recomputes every hash.
 
-- **A. Memory-first** ✅ SELECTED：Volatility 3 provider + dfir-investigate skill + custody log。最自包含，demo 路徑最短（一個 memory dump → agent 找出 injected process）。 scaffold 已建成（見 §8）。
-- **B. Triage+timeline-first**：plaso + evtx + yara providers。覆蓋面廣但每個都薄。
-- **C. Skeleton-first**：完整 repo 骨架（MCP server、setup/doctor、skill、contracts、eval harness），provider 先留 stub。最快有「像樣的 repo」形狀，再逐一填肉。
+| The chain detects | The chain does not detect |
+|---|---|
+| A changed field in any record | Deletion of the whole log |
+| A removed or reordered record in the middle | Records removed from the end |
+| An inserted record | A log rewritten from scratch by someone who can write the file |
 
-## 8. 實作現況（2026-10-17）
+Nothing outside the file anchors the tip hash, so the log is tamper-evident
+only against changes made without recomputing the chain. The log also has no
+lock: two servers writing to the same file can produce duplicate sequence
+numbers and break the chain.
 
-- `dfa-agents` npm 套件骨架：`src/main.ts`（serve/doctor CLI）、`src/server/`（MCP server，11 個 tools）
-- `src/volatility3/Volatility3Client.ts`：allow-list 12 個 plugin，唯讀執行 + JSON 解析 + image SHA-256
-- `src/custody/CustodyLog.ts`：hash-chained JSONL audit log，`verify()` 可偵測竄改（vitest 3 tests 通過）
-- `skills/dfir-investigate/`：SKILL.md + references/memory-forensics.md
-- 驗證：`npm run build` 通過；Volatility 3 Framework 2.28.2（venv）；MCP stdio smoke test 通過（tools/list、dfa_doctor、isError 錯誤回傳、DFA_EVIDENCE_DIR allowlist）
-- **2026-10-17 新增 report generator**：`src/report/ReportGenerator.ts` — 自包含 HTML 鑑識報告（零外部資源，可列印成 PDF）：案件資訊、證物清單、chain-of-custody 時間軸、方法、發現、限制六章節＋完整性橫幅（intact/broken）。custody record 新增 `detail` 明文字段（納入 hash）。MCP tool `dfa_report_generate` + CLI `dfa-agents report --out/--verify`。vitest 6 tests 全過，MCP + CLI 端到端驗證通過。
-- 待辦：eval harness、demo memory image、setup CLI
+## Trust boundaries
 
-## 7. 待定
+- **Evidence is untrusted input.** Process names, command lines, shell
+  history and environment variables are attacker-controlled text. Every
+  result that carries such data, and every backend error, is marked
+  `_meta.provenance.untrusted_content: true` with its source (`evidence`,
+  `backend` or `custody`), and the server's instructions tell the agent never
+  to follow instructions found there. This is a signal to the client, not an
+  enforcement mechanism.
+- **Tool annotations are honest hints.** Analysis tools are declared
+  `readOnlyHint: false` because they append to the custody log, with
+  `destructiveHint: false` and `openWorldHint: false` (Volatility runs
+  offline).
+- **The agent chooses the path.** With `DFA_EVIDENCE_DIR` unset, any regular
+  file the user can read is accepted as an image.
+- **Errors are typed.** Failures come back as tool results with
+  `isError: true` and a structured `error` (`code`, `category`, `message`,
+  `retryable`, `remediation`), so that an error is not mistaken for an empty
+  result.
 
-- 正式命名（DFA / DIRA / 其他）
-- License：MIT（已定，見 LICENSE）
+## Report
+
+The report is one HTML file with inline styles, every interpolated value
+escaped, and a Content-Security-Policy meta tag (`default-src 'none';
+style-src 'unsafe-inline'`). Over MCP the agent supplies a file name only
+(`[A-Za-z0-9._-]+.html`); the file is created under the report directory with
+`O_CREAT | O_EXCL | O_NOFOLLOW`, mode 0600, so an existing path or a symlink
+is never written through. A report directory that is itself a symlink is
+refused (`report_dir_unsafe`).
