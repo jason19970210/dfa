@@ -21,18 +21,16 @@ export const VOLATILITY_PLUGINS = {
   psscan: "windows.psscan",
   malfind: "windows.malfind",
   netscan: "windows.netscan",
-  netstat: "windows.netstat",
   cmdline: "windows.cmdline",
   dlllist: "windows.dlllist",
   filescan: "windows.filescan",
-  handles: "windows.handles",
   // Linux plugins (Volatility 3 linux.*). Same read-only contract: no
   // plugin here writes to the evidence.
   //
   // NOTE on naming vs windows.*: Volatility 3.2 has no linux.info,
   // linux.netscan, linux.cmdline, or linux.env. Their roles are covered by:
   //   linux.info    -> banners        (kernel banner identification)
-  //   linux.netscan -> linux.sockstat (socket enumeration; with linux.netstat)
+  //   linux.netscan -> linux.sockstat (socket enumeration; with linux.sockscan)
   //   linux.cmdline -> linux.psaux    (process list with command lines)
   //   linux.env     -> linux.envars   (process environment variables)
   linux_info: "banners",

@@ -36,9 +36,11 @@ Follow these phases in order. Do not skip triage.
    `memfd:` executables (Linux).
 3. **Hunt injection** — `malfind` on suspicious PIDs, then `psscan` to
    catch hidden/unlinked processes.
-4. **Corroborate** — `netscan` (C2?), `cmdline` (suspicious arguments),
-   `dlllist` (unsigned/odd DLLs, Windows), `bash` history + `envars`
-   (Linux), `lsmod` vs `check_modules` (hidden kernel modules, Linux).
+4. **Corroborate** — network: `netscan` (Windows) or `linux_sockstat` +
+   `linux_sockscan` (Linux), looking for C2. Command lines: `cmdline`
+   (Windows) or `linux_psaux` (Linux). Then `dlllist` (unsigned/odd DLLs,
+   Windows), `linux_bash` history + `linux_envars` (Linux), `linux_lsmod`
+   vs `linux_check_modules` (hidden kernel modules, Linux).
 5. **Report** — Write findings as: observation → evidence (tool + custody
    seq) → limitation → confidence. Every finding must cite custody seq
    numbers — a finding without one does not enter the report. Then generate

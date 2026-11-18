@@ -8,7 +8,7 @@ import { VOLATILITY_PLUGINS } from "./Volatility3Client.js";
  * has no linux.info / linux.netscan / linux.cmdline / linux.env — their
  * roles are covered by banners, linux.sockstat, linux.psaux, linux.envars).
  *
- * Skips gracefully when no vol binary is available (CI without Volatility).
+ * Skipped when DFA_VOL_BIN is unset.
  */
 function volBin(): string | null {
   return process.env.DFA_VOL_BIN ?? null;
@@ -37,13 +37,9 @@ function listPlugins(bin: string): Promise<string[]> {
 }
 
 describe("Volatility3Client plugin allow-list", () => {
-  it("every allow-listed plugin exists in the installed Volatility 3", async () => {
-    const bin = volBin();
-    if (!bin) {
-      console.warn("DFA_VOL_BIN not set; skipping plugin existence check");
-      return;
-    }
-    const available = await listPlugins(bin);
+  // Reported as skipped, not passed, when no Volatility is configured.
+  it.skipIf(!volBin())("every allow-listed plugin exists in the installed Volatility 3", async () => {
+    const available = await listPlugins(volBin() as string);
     const missing = (Object.values(VOLATILITY_PLUGINS) as string[]).filter(
       (plugin) => !available.some((a) => a === plugin || a.startsWith(plugin + ".")),
     );

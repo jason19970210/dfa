@@ -5,6 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeFakeVol, type FakeVol } from "../testing/fakeVol.js";
+import { VOLATILITY_PLUGINS } from "../volatility3/Volatility3Client.js";
 import { createServer } from "./index.js";
 
 const EFFECT_SENTENCE = "Does not modify evidence; appends to the dfa audit log.";
@@ -142,5 +143,28 @@ describe("MCP server contract", () => {
   it("reports the package.json version", async () => {
     const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
     expect((await connect()).getServerVersion()?.version).toBe(pkg.version);
+  });
+
+  it("registers one tool per allow-listed plugin", async () => {
+    const { tools } = await (await connect()).listTools();
+    const analysis = tools.filter((t) => t.name.startsWith("dfa_volatility_"));
+    expect(analysis).toHaveLength(Object.keys(VOLATILITY_PLUGINS).length);
+  });
+
+  it("docs name only registered tools", async () => {
+    const { tools } = await (await connect()).listTools();
+    const names = new Set(tools.map((t) => t.name));
+    for (const doc of [
+      "../../README.md",
+      "../../skills/dfir-investigate/SKILL.md",
+      "../../skills/dfir-investigate/references/memory-forensics.md",
+    ]) {
+      const text = readFileSync(new URL(doc, import.meta.url), "utf8");
+      for (const name of new Set(text.match(/dfa_[a-z0-9_]+/g) ?? [])) {
+        // "dfa_volatility_linux_*" in prose matches as a prefix ending in "_".
+        const known = name.endsWith("_") ? [...names].some((n) => n.startsWith(name)) : names.has(name);
+        expect(known, `${doc} names ${name}`).toBe(true);
+      }
+    }
   });
 });
