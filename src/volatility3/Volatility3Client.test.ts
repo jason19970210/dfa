@@ -31,6 +31,7 @@ describe("Volatility3Client", () => {
     await new Volatility3Client(vol.bin).run("linux_pslist", vol.image);
     // vol 2.28.2 takes one semicolon-separated -s value; a repeated -s keeps only the last.
     expect(vol.lastArgv()).toEqual([
+      "-q",
       "--offline",
       "--cache-path",
       join(home, "cache", "volatility3"),

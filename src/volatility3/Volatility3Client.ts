@@ -136,6 +136,8 @@ export class Volatility3Client {
     // --offline: no symbol downloads, so no network and no writes into the
     // vol install; Windows symbols must be provisioned via DFA_SYMBOL_DIRS.
     const args = [
+      // -q: no progress lines, so a failure's stderr is the actual error.
+      "-q",
       "--offline",
       "--cache-path",
       volCacheDir(),
