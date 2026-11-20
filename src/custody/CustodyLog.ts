@@ -103,7 +103,8 @@ export class CustodyLog {
     };
     const hash = sha256Hex(prevHash + canonicalJson(body));
     const record: CustodyRecord = { ...body, hash };
-    appendFileSync(this.path, canonicalJson(record) + "\n", "utf8");
+    // The mode applies only when the file is created; an existing log keeps its own.
+    appendFileSync(this.path, canonicalJson(record) + "\n", { encoding: "utf8", mode: 0o600 });
     return record;
   }
 
