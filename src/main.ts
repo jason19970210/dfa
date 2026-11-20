@@ -67,8 +67,28 @@ async function reportCmd(rawArgs: string[]): Promise<void> {
   console.log(JSON.stringify({ report: out, records: log.readAll().length, chainOk: res.ok }, null, 2));
 }
 
+const USAGE = `Usage: dfa-agents [command]
+
+Commands:
+  serve     Run the MCP server on stdio (default)
+  doctor    Check that Volatility 3 is available
+  report    Write an HTML report from the custody log, or verify the log
+            (run "dfa-agents report" for its options)
+
+Options:
+  -h, --help       Show this help
+  -v, --version    Show the version`;
+
 async function main(): Promise<void> {
   const cmd = process.argv[2] ?? "serve";
+  if (cmd === "--help" || cmd === "-h") {
+    console.log(USAGE);
+    return;
+  }
+  if (cmd === "--version" || cmd === "-v") {
+    console.log(DFA_VERSION);
+    return;
+  }
   if (cmd === "doctor") {
     await doctor();
     return;
@@ -81,7 +101,7 @@ async function main(): Promise<void> {
     await runStdioServer();
     return;
   }
-  console.error(`Unknown command: ${cmd}\nUsage: dfa-agents [serve|doctor|report]`);
+  console.error(`Unknown command: ${cmd}\n${USAGE}`);
   process.exitCode = 2;
 }
 

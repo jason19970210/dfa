@@ -204,7 +204,7 @@ export function createServer(): McpServer {
   registerVolTool(
     "dfa_volatility_linux_sockstat",
     "linux_sockstat",
-    "Socket enumeration from a Linux memory image (Volatility 3 linux.sockstat). Pair with netstat for C2 hunting. Read-only.",
+    "Socket enumeration from a Linux memory image (Volatility 3 linux.sockstat). Pair with sockscan for C2 hunting. Read-only.",
   );
   registerVolTool(
     "dfa_volatility_linux_sockscan",

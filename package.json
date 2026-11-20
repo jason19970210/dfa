@@ -2,16 +2,19 @@
   "bin": {
     "dfa-agents": "./dist/main.js"
   },
+  "bugs": {
+    "url": "https://github.com/jason19970210/dfa/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
     "zod": "^3.23.8"
   },
-  "description": "DFA: Digital Forensics Anything — one MCP server for DFIR across memory, disk, timeline, and network evidence.",
+  "description": "DFA: Digital Forensics Anything. An MCP server for memory forensics with Volatility 3 and a hash-chained custody log.",
   "devDependencies": {
     "@types/node": "^22.7.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^5.1.1"
   },
   "engines": {
     "node": ">=22"
@@ -20,18 +23,32 @@
     "dist",
     "skills",
     "README.md",
-    "ARCHITECTURE.md"
+    "DISCLAIMER.md"
+  ],
+  "homepage": "https://github.com/jason19970210/dfa#readme",
+  "keywords": [
+    "mcp",
+    "dfir",
+    "memory-forensics",
+    "volatility3",
+    "digital-forensics",
+    "incident-response"
   ],
   "license": "MIT",
   "name": "dfa-agents",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jason19970210/dfa.git"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/main.ts",
     "doctor": "node dist/main.js doctor",
     "lint": "tsc --noEmit -p tsconfig.json",
     "postbuild": "chmod +x dist/main.js",
+    "prepack": "npm run build",
     "start": "node dist/main.js",
-    "test": "vitest run"
+    "test": "vitest run --pool=forks"
   },
   "type": "module",
   "version": "0.1.0"

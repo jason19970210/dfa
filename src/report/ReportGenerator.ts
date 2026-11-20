@@ -236,7 +236,7 @@ ${banner}
 <dl class="kv">
   <dt>Tools used</dt><dd class="mono">${tools.map(esc).join("<br>") || "—"}</dd>
   <dt>DFA version</dt><dd class="mono">${esc(opts.dfaVersion)}</dd>
-  <dt>Evidence handling</dt><dd>dfa opens evidence read-only and records the SHA-256 of each image in every custody record. dfa does not yet compare these hashes against an acquisition hash, and no hardware write blocker is used. Timestamps come from the analysis host clock. Each tool call is recorded in the custody log with hashes of its inputs and outputs, chained to the previous record.</dd>
+  <dt>Evidence handling</dt><dd>dfa opens evidence read-only and records the SHA-256 of each image in every custody record. dfa does not yet compare these hashes against an acquisition hash, and no hardware write blocker is used. Timestamps come from the analysis host clock. Each successful analysis is recorded in the custody log with hashes of its arguments and output, chained to the previous record. Failed runs are not recorded.</dd>
 </dl>
 
 <h2 class="sec">5. Findings</h2>

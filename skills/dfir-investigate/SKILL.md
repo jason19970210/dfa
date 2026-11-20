@@ -1,6 +1,6 @@
 ---
 name: dfir-investigate
-description: Investigate a DFIR case with DFA — memory forensics first. Use when a claim depends on evidence inside a memory image, a suspected compromise needs triage, or a forensic timeline/report must be produced from acquired evidence. Skip DFA for ordinary log review that existing SIEM queries already answer.
+description: Investigate a DFIR case with DFA — memory forensics first. Use when a claim depends on evidence inside a memory image, a suspected compromise needs triage from a memory image, or a forensic report must be produced from memory analysis. Skip DFA for ordinary log review that existing SIEM queries already answer.
 metadata:
   version: "1"
   tool_count: 29
@@ -14,9 +14,10 @@ that evidence. Never write to an evidence file. Never invent IOCs.
 
 ## When to use DFA
 
-Use DFA when the question depends on evidence acquired from a host: a memory
-image, and later disk images, event logs, or pcaps. For ordinary analysis of
-logs already searchable in a SIEM, use normal tooling and do not reach for DFA.
+Use DFA when the question depends on a memory image acquired from a host.
+DFA does not analyse disk images, event logs or packet captures. For ordinary
+analysis of logs already searchable in a SIEM, use normal tooling and do not
+reach for DFA.
 
 If DFA tools are unavailable, run `dfa_doctor` first and diagnose the blocker
 (Volatility 3 missing, image path wrong, MCP not connected) before continuing.
@@ -36,9 +37,11 @@ Follow these phases in order. Do not skip triage.
    `memfd:` executables (Linux).
 3. **Hunt injection** — `malfind` on suspicious PIDs, then `psscan` to
    catch hidden/unlinked processes.
-4. **Corroborate** — `netscan` (C2?), `cmdline` (suspicious arguments),
-   `dlllist` (unsigned/odd DLLs, Windows), `bash` history + `envars`
-   (Linux), `lsmod` vs `check_modules` (hidden kernel modules, Linux).
+4. **Corroborate** — network: `netscan` (Windows) or `linux_sockstat` +
+   `linux_sockscan` (Linux), looking for C2. Command lines: `cmdline`
+   (Windows) or `linux_psaux` (Linux). Then `dlllist` (unsigned/odd DLLs,
+   Windows), `linux_bash` history + `linux_envars` (Linux), `linux_lsmod`
+   vs `linux_check_modules` (hidden kernel modules, Linux).
 5. **Report** — Write findings as: observation → evidence (tool + custody
    seq) → limitation → confidence. Every finding must cite custody seq
    numbers — a finding without one does not enter the report. Then generate

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,6 +18,12 @@ describe("CustodyLog", () => {
     expect(r2.prevHash).toBe(r1.hash);
     expect(log.verify()).toEqual({ ok: true });
     expect(log.readAll()).toHaveLength(2);
+  });
+
+  it("creates the log readable by its owner only", () => {
+    const log = freshLog();
+    log.append({ tool: "volatility3.pslist", args: { image: "a.img" }, output: [] });
+    expect(statSync(log.path).mode & 0o777).toBe(0o600);
   });
 
   it("detects tampering", () => {

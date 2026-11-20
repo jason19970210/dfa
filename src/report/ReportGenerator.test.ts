@@ -138,6 +138,9 @@ describe("generateReportHtml", () => {
     expect(html).toContain("does not yet compare these hashes against an acquisition hash");
     expect(html).toContain("no hardware write blocker is used");
     expect(html).toContain("Timestamps come from the analysis host clock");
+    expect(html).toContain("Each successful analysis is recorded");
+    expect(html).toContain("Failed runs are not recorded");
+    expect(html).not.toContain("Each tool call is recorded");
     expect(html.toLowerCase()).not.toContain("court-ready");
   });
 });

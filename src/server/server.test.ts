@@ -5,6 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeFakeVol, type FakeVol } from "../testing/fakeVol.js";
+import { VOLATILITY_PLUGINS } from "../volatility3/Volatility3Client.js";
 import { createServer } from "./index.js";
 
 const EFFECT_SENTENCE = "Does not modify evidence; appends to the dfa audit log.";
@@ -142,5 +143,71 @@ describe("MCP server contract", () => {
   it("reports the package.json version", async () => {
     const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
     expect((await connect()).getServerVersion()?.version).toBe(pkg.version);
+  });
+
+  it("registers exactly one tool per allow-listed plugin", async () => {
+    const { tools } = await (await connect()).listTools();
+    const analysis = tools.map((t) => t.name).filter((n) => n.startsWith("dfa_volatility_"));
+    expect(analysis.sort()).toEqual(
+      Object.keys(VOLATILITY_PLUGINS)
+        .map((k) => `dfa_volatility_${k}`)
+        .sort(),
+    );
+  });
+
+  const DOCS = [
+    "../../README.md",
+    "../../skills/dfir-investigate/SKILL.md",
+    "../../skills/dfir-investigate/references/memory-forensics.md",
+  ];
+  const readDoc = (doc: string) => readFileSync(new URL(doc, import.meta.url), "utf8");
+
+  /**
+   * Tool names a text refers to that are not registered: full `dfa_*` names
+   * and bare `linux_*` short names. Bare Windows short names (`netscan`,
+   * `cmdline`) are ordinary words and cannot be told from prose, so a wrong
+   * one is not caught here.
+   */
+  function unknownToolNames(text: string, names: Set<string>): string[] {
+    const full = (text.match(/dfa_[a-z0-9_]+/g) ?? []).filter((name) =>
+      // "dfa_volatility_linux_*" in prose matches as a prefix ending in "_".
+      name.endsWith("_") ? ![...names].some((n) => n.startsWith(name)) : !names.has(name),
+    );
+    const bare = (text.match(/(?<![a-z0-9_])linux_[a-z0-9_]+/g) ?? []).filter(
+      (name) => !names.has(`dfa_volatility_${name}`),
+    );
+    return [...new Set([...full, ...bare])];
+  }
+
+  it("flags unregistered full and bare tool names", () => {
+    const names = new Set(["dfa_volatility_linux_pslist", "dfa_doctor"]);
+    expect(unknownToolNames("dfa_doctor, dfa_volatility_linux_*, linux_pslist, linux-sample-1", names)).toEqual([]);
+    expect(unknownToolNames("dfa_volatility_netstat and linux_netstat", names)).toEqual([
+      "dfa_volatility_netstat",
+      "linux_netstat",
+    ]);
+  });
+
+  it("docs and tool descriptions name only registered tools", async () => {
+    const { tools } = await (await connect()).listTools();
+    const names = new Set(tools.map((t) => t.name));
+    for (const doc of DOCS) expect(unknownToolNames(readDoc(doc), names), doc).toEqual([]);
+    for (const t of tools) expect(unknownToolNames(t.description ?? "", names), t.name).toEqual([]);
+  });
+
+  it("README names every tool, and the stated counts match", async () => {
+    const { tools } = await (await connect()).listTools();
+    const readme = readDoc(DOCS[0]);
+    const keys = Object.keys(VOLATILITY_PLUGINS);
+    const linux = keys.filter((k) => k.startsWith("linux_"));
+    // Linux tools are listed as one `dfa_volatility_linux_*` row.
+    for (const t of tools.filter((t) => !t.name.startsWith("dfa_volatility_linux_"))) {
+      expect(readme, t.name).toContain(`\`${t.name}\``);
+    }
+    expect(readme).toContain(
+      `${keys.length} allow-listed Volatility 3 plugins (${keys.length - linux.length} Windows, ${linux.length} Linux)`,
+    );
+    expect(readme).toContain(`\`dfa_volatility_linux_*\` (${linux.length} tools)`);
+    expect(readDoc(DOCS[1])).toContain(`tool_count: ${tools.length}`);
   });
 });
