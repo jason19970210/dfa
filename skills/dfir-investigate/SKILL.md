@@ -1,6 +1,6 @@
 ---
 name: dfir-investigate
-description: Investigate a DFIR case with DFA — memory forensics first. Use when a claim depends on evidence inside a memory image, a suspected compromise needs triage, or a forensic timeline/report must be produced from acquired evidence. Skip DFA for ordinary log review that existing SIEM queries already answer.
+description: Investigate a DFIR case with DFA — memory forensics first. Use when a claim depends on evidence inside a memory image, a suspected compromise needs triage from a memory image, or a forensic report must be produced from memory analysis. Skip DFA for ordinary log review that existing SIEM queries already answer.
 metadata:
   version: "1"
   tool_count: 29
@@ -14,9 +14,10 @@ that evidence. Never write to an evidence file. Never invent IOCs.
 
 ## When to use DFA
 
-Use DFA when the question depends on evidence acquired from a host: a memory
-image, and later disk images, event logs, or pcaps. For ordinary analysis of
-logs already searchable in a SIEM, use normal tooling and do not reach for DFA.
+Use DFA when the question depends on a memory image acquired from a host.
+DFA does not analyse disk images, event logs or packet captures. For ordinary
+analysis of logs already searchable in a SIEM, use normal tooling and do not
+reach for DFA.
 
 If DFA tools are unavailable, run `dfa_doctor` first and diagnose the blocker
 (Volatility 3 missing, image path wrong, MCP not connected) before continuing.

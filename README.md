@@ -2,7 +2,8 @@
 
 **An MCP server for memory forensics.** DFA lets a coding agent run
 [Volatility 3](https://github.com/volatilityfoundation/volatility3) against a
-memory image, and writes every tool call to a hash-chained custody log.
+memory image, and records each successful analysis in a hash-chained custody
+log.
 
 > **Status: v0.1.0, early.** Memory images only. Not on npm yet: install from
 > a clone. Read [Known limitations](#known-limitations) and
@@ -66,8 +67,13 @@ Register DFA with your agent. For Claude Code (use absolute paths):
 claude mcp add dfa \
   -e DFA_VOL_BIN=/absolute/path/to/dfa/.venv/bin/vol \
   -e DFA_SYMBOL_DIRS="$HOME/dfa-demo/symbols" \
+  -e DFA_EVIDENCE_DIR="$HOME/dfa-demo/evidence" \
   -- node /absolute/path/to/dfa/dist/main.js serve
 ```
+
+`claude mcp add` registers the server for the directory it is run in (its
+default `local` scope). Start `claude` from that same directory, or add
+`--scope user` to make DFA available everywhere.
 
 For any other MCP client, the server is a stdio command:
 
@@ -77,14 +83,19 @@ For any other MCP client, the server is a stdio command:
   "args": ["/absolute/path/to/dfa/dist/main.js", "serve"],
   "env": {
     "DFA_VOL_BIN": "/absolute/path/to/dfa/.venv/bin/vol",
-    "DFA_SYMBOL_DIRS": "/home/you/dfa-demo/symbols"
+    "DFA_SYMBOL_DIRS": "/home/you/dfa-demo/symbols",
+    "DFA_EVIDENCE_DIR": "/home/you/dfa-demo/evidence"
   }
 }
 ```
 
-Then ask the agent to list the processes in
-`~/dfa-demo/evidence/linux-sample-1.bin`. `dfa_volatility_linux_pslist`
-returns 133 processes; PID 1 is `init`.
+`DFA_EVIDENCE_DIR` limits DFA to images under that directory. Without it,
+DFA will hash and analyse any regular file the agent names.
+
+Then ask the agent to list the processes in the image, giving its absolute
+path, for example `/home/you/dfa-demo/evidence/linux-sample-1.bin` (DFA does
+not expand `~`). `dfa_volatility_linux_pslist` returns 133 processes; PID 1
+is `init`.
 
 ## Symbols
 
@@ -96,17 +107,20 @@ without one every analysis tool except `dfa_volatility_linux_info` fails with
 
 Set `DFA_SYMBOL_DIRS` to one or more directories (separated by `:`). Each
 directory holds the layout Volatility expects: a `linux/` or `windows/`
-subdirectory containing ISF files (`.json`, `.json.xz`).
+subdirectory of ISF files (`.json`, `.json.xz`).
 
-- **Linux.** Run `dfa_volatility_linux_info` to read the kernel banner, then
-  build the ISF for that exact kernel with
+- **Linux.** ISF files sit directly under `linux/`; Volatility matches them
+  to the image by kernel banner. Run `dfa_volatility_linux_info` to read the
+  banner, then build the ISF for that exact kernel with
   [dwarf2json](https://github.com/volatilityfoundation/dwarf2json) from the
-  distribution's debug kernel package, and put it under `linux/`. See
-  Volatility's
+  distribution's debug kernel package. See Volatility's
   [symbol tables documentation](https://volatility3.readthedocs.io/en/latest/symbol-tables.html).
-- **Windows.** Volatility builds the ISF from a PDB that it downloads from
-  Microsoft's symbol server. DFA blocks that download during analysis, so the
-  ISF has to be produced beforehand and placed under `windows/`. A
+- **Windows.** Volatility identifies a Windows ISF by the PDB name, GUID and
+  age stored inside it. The layout it writes itself, and the safe one to
+  copy, is `windows/<pdb name>/<GUID>-<AGE>.json.xz` (for example a file
+  under `windows/ntkrnlmp.pdb/`). Volatility normally builds this file from
+  a PDB that it downloads from Microsoft's symbol server. DFA blocks that
+  download during analysis, so the ISF has to be in place beforehand. A
   provisioning command for this is planned (see [ROADMAP.md](ROADMAP.md));
   until then the Windows path is manual and has not been exercised by this
   project on a real image.
@@ -134,8 +148,12 @@ record to the custody log. Large results are returned 200 rows at a time
 Every successful analysis appends one JSON line to `~/.dfa/custody.jsonl`:
 
 ```
-seq | ts | tool | argsHash | evidenceHash (image SHA-256) | outputHash | detail | prevHash | hash
+seq | ts | tool | argsHash | evidenceHash (image SHA-256) | outputHash | detail | note | prevHash | hash
 ```
+
+The log is created readable by its owner only (mode 0600). A log created by
+an earlier version keeps the mode it has, and DFA does not change the
+permissions of the directory that holds it.
 
 Each record's `hash` covers the record and the previous record's hash.
 `dfa_custody_verify` (or `node dist/main.js report --verify`) re-walks the
@@ -172,15 +190,24 @@ and state their limitations.
 - **The chain detects edited records, not a missing log.** A deleted log, or
   records removed from the end, still verify. Keep the tip hash shown in the
   report somewhere else if you need to detect that.
-- **Failed runs are not recorded** in the custody log.
+- **Failed runs are not recorded** in the custody log, and neither are
+  `dfa_doctor`, `dfa_custody_verify` or `dfa_report_generate`.
+- **Outputs are not kept.** The log holds a hash of each result, not the
+  result. To check an `outputHash` later you have to run the analysis again.
+- **Cancelling a call does not stop Volatility.** A run that the client
+  cancels keeps going until it finishes or reaches the time limit.
+- **No evidence root unless you set one.** With `DFA_EVIDENCE_DIR` unset,
+  DFA accepts any regular file the agent names and returns its SHA-256.
+- **No server log.** DFA writes no diagnostics of its own; a failure is
+  visible only in the tool result.
 - **Paging re-runs Volatility.** Each page of a large result is a new
   Volatility run and a new custody record.
 - **Little has run on real images so far.** `linux_pslist`, `linux_psaux`
   and `linux_info` were run by hand on the public sample above. The other
   Linux tools and all Windows tools have only been tested against a stand-in
   for Volatility.
-- **Limits.** Each run is cut off after 10 minutes. The 4 GiB memory cap
-  applies on Linux hosts only.
+- **Limits.** Each run is cut off after 10 minutes, or when Volatility's
+  output passes 256 MiB. The 4 GiB memory cap applies on Linux hosts only.
 - **Dependency advisory.** `npm audit` reports a denial-of-service advisory
   for zod 3. DFA only receives input from the local MCP client; the move to
   zod 4 is scheduled.

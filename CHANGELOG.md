@@ -16,9 +16,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Volatility now runs with `-q`, so an error is no longer buried in progress
-  output.
-- The README, `ARCHITECTURE.md` and `ROADMAP.md` describe only what exists:
-  memory forensics. All public documents are in English.
+  output. The Volatility arguments are part of `argsHash`, so the same call
+  hashes differently from a record written before this change.
+- A new custody log is created with mode 0600. Existing logs keep their mode.
+- The report says that successful analyses are recorded, not every tool call.
+- The README and `ARCHITECTURE.md` describe only what exists: memory
+  forensics. `ROADMAP.md` is the plan. All public documents are in English.
 - The plugin-existence test is reported as skipped, not passed, when no
   Volatility is configured.
 - vitest 5; other dependencies refreshed.
