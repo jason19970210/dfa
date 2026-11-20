@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "description": "DFA: Digital Forensics Anything. An MCP server for memory forensics with Volatility 3 and a hash-chained custody log.",
   "devDependencies": {
